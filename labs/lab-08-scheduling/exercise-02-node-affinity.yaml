@@ -1,0 +1,43 @@
+---
+# Exercise 2: Node Affinity
+# TODO: fill in the affinity rules
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: affinity-pod
+  namespace: lab08
+spec:
+  affinity:
+    nodeAffinity:
+      # TODO: add HARD rule (requiredDuringSchedulingIgnoredDuringExecution)
+      # that requires kubernetes.io/os = linux
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: # TODO: kubernetes.io/os
+                operator: # TODO: In
+                values:
+                  - # TODO: linux
+
+      # TODO: add SOFT rule (preferredDuringSchedulingIgnoredDuringExecution)
+      # weight: 50, preference: region = us-east
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: # TODO: 50
+          preference:
+            matchExpressions:
+              - key: # TODO: region
+                operator: In
+                values:
+                  - # TODO: us-east
+
+  containers:
+    - name: nginx
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"

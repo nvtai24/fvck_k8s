@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: lab02
+  labels:
+    app: web
+spec:
+  replicas: # TODO: set to 3
+  selector:
+    matchLabels:
+      app: # TODO: set to "web"
+  strategy:
+    type: # TODO: set to RollingUpdate
+    rollingUpdate:
+      maxSurge: # TODO: set to 1
+      maxUnavailable: # TODO: set to 0
+  template:
+    metadata:
+      labels:
+        app: # TODO: set to "web"
+    spec:
+      containers:
+        - name: nginx
+          image: # TODO: use nginx:1.24 (old version, we will update it later)
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: # TODO: set to "100m"
+              memory: # TODO: set to "64Mi"
+            limits:
+              cpu: # TODO: set to "200m"
+              memory: # TODO: set to "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: # TODO: set to 10
+            periodSeconds: 10

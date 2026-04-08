@@ -1,0 +1,32 @@
+# Prerequisites: apply exercise-01-clusterip.yaml and exercise-02-nodeport.yaml first
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lab-ingress
+  namespace: lab03
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: # TODO: set to "lab.local"
+      http:
+        paths:
+          # TODO: route /api to backend-svc port 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: # TODO: "backend-svc"
+                port:
+                  number: # TODO: 80
+
+          # TODO: route /web to frontend-svc port 80
+          - path: /web
+            pathType: Prefix
+            backend:
+              service:
+                name: # TODO: "frontend-svc"
+                port:
+                  number: # TODO: 80

@@ -1,0 +1,365 @@
+# ============================================================
+# Capstone Solution — Full-Stack App on Kubernetes
+# ============================================================
+
+---
+# 1. Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: capstone
+
+---
+# 2. ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: capstone
+data:
+  DB_HOST: "mysql-headless.capstone.svc.cluster.local"
+  DB_PORT: "3306"
+  DB_NAME: "capstone_db"
+
+---
+# 3. Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+  namespace: capstone
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "RootPass123!"
+  DB_PASSWORD: "AppPass456!"
+
+---
+# 4. ServiceAccount for backend
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backend-sa
+  namespace: capstone
+
+---
+# 5. Role for backend-sa
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: backend-role
+  namespace: capstone
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "configmaps"]
+    verbs: ["get", "list"]
+
+---
+# 6. RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: backend-rolebinding
+  namespace: capstone
+subjects:
+  - kind: ServiceAccount
+    name: backend-sa
+    namespace: capstone
+roleRef:
+  kind: Role
+  name: backend-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# 7. MySQL Headless Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-headless
+  namespace: capstone
+spec:
+  clusterIP: None
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      name: mysql
+
+---
+# 8. MySQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: capstone
+spec:
+  serviceName: mysql-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DB_NAME
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
+
+---
+# 9. Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: capstone
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      serviceAccountName: backend-sa
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: backend
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: backend
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      terminationGracePeriodSeconds: 30
+
+---
+# 10. Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: capstone
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+# 11. Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: capstone
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+
+---
+# 12. Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: capstone
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+# 13. Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: capstone-ingress
+  namespace: capstone
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: lab11.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 80
+
+---
+# 14. HPA for backend
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: capstone
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+---
+# 15. PDB for backend
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+  namespace: capstone
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: backend
+
+---
+# 16. PDB for frontend
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-pdb
+  namespace: capstone
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: frontend

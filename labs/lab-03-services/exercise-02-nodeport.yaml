@@ -1,0 +1,46 @@
+---
+# Deployment: frontend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: lab03
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: # TODO: "frontend"
+  template:
+    metadata:
+      labels:
+        app: # TODO: "frontend"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+# NodePort Service: frontend-svc
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: lab03
+spec:
+  type: # TODO: set to NodePort
+  selector:
+    app: # TODO: match frontend pods
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: # TODO: set to 30080
+      name: http

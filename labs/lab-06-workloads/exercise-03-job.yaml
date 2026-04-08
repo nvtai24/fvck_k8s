@@ -1,0 +1,32 @@
+---
+# Exercise 3: Job — compute Pi digits
+# TODO: fill in all # TODO fields
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi-calculator
+  namespace: lab06
+spec:
+  completions: 1
+  backoffLimit: # TODO: 2
+  ttlSecondsAfterFinished: 300
+
+  template:
+    spec:
+      restartPolicy: # TODO: Never
+      containers:
+        - name: pi
+          image: # TODO: perl:5.34
+          command:
+            - # TODO: "perl"
+            - # TODO: "-Mbignum=bpi"
+            - # TODO: "-wle"
+            - # TODO: "print bpi(2000)"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "128Mi"

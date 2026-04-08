@@ -1,0 +1,57 @@
+---
+# SOLUTION 1: StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-headless
+  namespace: lab06
+spec:
+  clusterIP: None
+  selector:
+    app: web-sts
+  ports:
+    - port: 80
+      name: http
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web-sts
+  namespace: lab06
+spec:
+  serviceName: web-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-sts
+  template:
+    metadata:
+      labels:
+        app: web-sts
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: web-data
+              mountPath: /usr/share/nginx/html
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+  volumeClaimTemplates:
+    - metadata:
+        name: web-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 500Mi

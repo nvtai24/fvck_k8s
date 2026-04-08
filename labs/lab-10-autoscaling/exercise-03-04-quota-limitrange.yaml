@@ -1,0 +1,41 @@
+---
+# Exercise 3: ResourceQuota
+# TODO: fill in the quota values
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: lab10-quota
+  namespace: lab10
+spec:
+  hard:
+    pods: # TODO: "2"
+    requests.cpu: # TODO: "500m"
+    requests.memory: # TODO: "512Mi"
+    limits.cpu: # TODO: "1"
+    limits.memory: # TODO: "1Gi"
+
+---
+# Exercise 4: LimitRange
+# TODO: fill in the default limits
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: lab10-limitrange
+  namespace: lab10
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: # TODO: "300m"    (default LIMIT)
+        memory: # TODO: "128Mi"
+      defaultRequest:
+        cpu: # TODO: "100m"    (default REQUEST)
+        memory: # TODO: "64Mi"
+      min:
+        cpu: # TODO: "50m"
+        memory: # TODO: "32Mi"
+      max:
+        cpu: # TODO: "1"
+        memory: # TODO: "512Mi"

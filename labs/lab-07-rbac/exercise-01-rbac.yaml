@@ -1,0 +1,44 @@
+---
+# Exercise 1: RBAC — ServiceAccount + Role + RoleBinding
+# TODO: fill in all # TODO fields
+
+# 1. ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: # TODO: "pod-reader-sa"
+  namespace: lab07
+automountServiceAccountToken: true
+
+---
+# 2. Role — read pods only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: # TODO: "pod-reader-role"
+  namespace: lab07
+rules:
+  - apiGroups:
+      - # TODO: "" (empty string = core API group)
+    resources:
+      - # TODO: "pods"
+    verbs:
+      - # TODO: "get"
+      - # TODO: "list"
+      - # TODO: "watch"
+
+---
+# 3. RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader-binding
+  namespace: lab07
+subjects:
+  - kind: # TODO: ServiceAccount
+    name: # TODO: "pod-reader-sa"
+    namespace: # TODO: lab07
+roleRef:
+  kind: # TODO: Role
+  name: # TODO: "pod-reader-role"
+  apiGroup: rbac.authorization.k8s.io

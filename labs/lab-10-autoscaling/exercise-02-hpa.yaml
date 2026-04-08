@@ -1,0 +1,68 @@
+---
+# Exercise 2: HPA
+# TODO: fill in all # TODO fields
+
+# 1. Deployment to autoscale
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-test-app
+  namespace: lab10
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-test-app
+  template:
+    metadata:
+      labels:
+        app: load-test-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: # TODO: "100m"
+              memory: # TODO: "64Mi"
+            limits:
+              cpu: # TODO: "200m"
+              memory: # TODO: "128Mi"
+
+---
+# 2. Service for the deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: load-test-svc
+  namespace: lab10
+spec:
+  selector:
+    app: load-test-app
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+# 3. HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: load-test-hpa
+  namespace: lab10
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: # TODO: "load-test-app"
+  minReplicas: # TODO: 1
+  maxReplicas: # TODO: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: # TODO: 50

@@ -1,0 +1,30 @@
+---
+# Exercise 4: Tolerations
+# TODO: fill in the toleration to allow scheduling on a tainted node
+
+# Taint the node first:
+# kubectl taint nodes <node-name> dedicated=lab:NoSchedule
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: toleration-pod
+  namespace: lab08
+spec:
+  tolerations:
+    # TODO: add a toleration for: key=dedicated, value=lab, effect=NoSchedule
+    - key: # TODO: "dedicated"
+      operator: # TODO: Equal
+      value: # TODO: "lab"
+      effect: # TODO: NoSchedule
+
+  containers:
+    - name: nginx
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"

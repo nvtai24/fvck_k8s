@@ -1,0 +1,43 @@
+---
+# Exercise 3: Pod Anti-Affinity — spread replicas across nodes
+# TODO: fill in the podAntiAffinity section
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spread-deploy
+  namespace: lab08
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spread-app
+  template:
+    metadata:
+      labels:
+        app: # TODO: "spread-app"
+    spec:
+      affinity:
+        podAntiAffinity:
+          # TODO: use preferredDuringSchedulingIgnoredDuringExecution
+          # weight: 100
+          # Avoid scheduling on the same node as another "spread-app" pod
+          # topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: # TODO: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: # TODO: "spread-app"
+                topologyKey: # TODO: "kubernetes.io/hostname"
+
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

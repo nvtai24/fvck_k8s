@@ -1,0 +1,154 @@
+---
+# SOLUTION 1: Resource QoS Classes
+
+# Pod 1: GUARANTEED (requests == limits for ALL containers)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guaranteed-pod
+  namespace: lab10
+spec:
+  containers:
+    - name: app
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "128Mi"
+        limits:
+          cpu: "200m"     # exactly equal to request → Guaranteed
+          memory: "128Mi" # exactly equal to request → Guaranteed
+
+---
+# Pod 2: BURSTABLE (limits > requests)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: burstable-pod
+  namespace: lab10
+spec:
+  containers:
+    - name: app
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "500m"     # higher → Burstable
+          memory: "256Mi"
+
+---
+# Pod 3: BESTEFFORT (no resources at all)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: besteffort-pod
+  namespace: lab10
+spec:
+  containers:
+    - name: app
+      image: nginx:1.25
+      # No resources block = BestEffort QoS
+
+---
+# SOLUTION 2: HPA + Deployment + Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-test-app
+  namespace: lab10
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-test-app
+  template:
+    metadata:
+      labels:
+        app: load-test-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: load-test-svc
+  namespace: lab10
+spec:
+  selector:
+    app: load-test-app
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: load-test-hpa
+  namespace: lab10
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: load-test-app
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+
+---
+# SOLUTION 3: ResourceQuota
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: lab10-quota
+  namespace: lab10
+spec:
+  hard:
+    pods: "2"
+    requests.cpu: "500m"
+    requests.memory: "512Mi"
+    limits.cpu: "1"
+    limits.memory: "1Gi"
+
+---
+# SOLUTION 4: LimitRange
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: lab10-limitrange
+  namespace: lab10
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "300m"
+        memory: "128Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "64Mi"
+      min:
+        cpu: "50m"
+        memory: "32Mi"
+      max:
+        cpu: "1"
+        memory: "512Mi"

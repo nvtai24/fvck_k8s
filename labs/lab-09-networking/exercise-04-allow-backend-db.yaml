@@ -1,0 +1,27 @@
+---
+# Exercise 4: Allow backend → database only
+# TODO: fill in the NetworkPolicy
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-db
+  namespace: lab09
+spec:
+  # This policy protects "database" pods
+  podSelector:
+    matchLabels:
+      app: # TODO: "database"
+
+  policyTypes:
+    - # TODO: Ingress
+
+  ingress:
+    - from:
+        # TODO: allow only from pods with label app=backend
+        - podSelector:
+            matchLabels:
+              app: # TODO: "backend"
+      ports:
+        - protocol: TCP
+          port: # TODO: 80

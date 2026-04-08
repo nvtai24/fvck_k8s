@@ -1,0 +1,47 @@
+---
+# TODO: fill in the missing fields marked with # TODO
+
+# Deployment: backend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: lab03
+spec:
+  replicas: # TODO: 2 replicas
+  selector:
+    matchLabels:
+      app: # TODO: set to "backend"
+  template:
+    metadata:
+      labels:
+        app: # TODO: set to "backend"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+# ClusterIP Service: backend-svc
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: lab03
+spec:
+  type: # TODO: set type to ClusterIP (or remove - it's the default)
+  selector:
+    app: # TODO: match the backend pods
+  ports:
+    - port: # TODO: service port 80
+      targetPort: # TODO: container port 80
+      name: http

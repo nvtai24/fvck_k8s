@@ -1,0 +1,42 @@
+---
+# SOLUTION 4: Deployment + ConfigMap (envFrom)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: lab02
+data:
+  APP_COLOR: "blue"
+  APP_VERSION: "1.0"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-with-config
+  namespace: lab02
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-with-config
+  template:
+    metadata:
+      labels:
+        app: web-with-config
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: web-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

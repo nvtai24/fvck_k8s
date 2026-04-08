@@ -1,0 +1,54 @@
+---
+# Exercise 2: ConfigMap as Mounted Files
+
+# 1. ConfigMap with nginx config file
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: lab04
+data:
+  # TODO: add a key named "nginx.conf" with the following nginx config content:
+  # server {
+  #     listen 80;
+  #     server_name _;
+  #     location / {
+  #         return 200 "Hello from ConfigMap nginx!\n";
+  #         add_header Content-Type text/plain;
+  #     }
+  # }
+  nginx.conf: |
+    # TODO: paste the nginx config here as a multi-line string
+
+---
+# 2. Pod that mounts the ConfigMap as a file
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-vol-pod
+  namespace: lab04
+spec:
+  volumes:
+    - name: nginx-conf-volume
+      configMap:
+        name: # TODO: reference "nginx-config"
+        items:
+          - key: # TODO: "nginx.conf"
+            path: # TODO: "default.conf" (the filename inside the mount directory)
+
+  containers:
+    - name: nginx
+      image: nginx:1.25
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: nginx-conf-volume
+          mountPath: # TODO: where nginx looks for conf.d configs: /etc/nginx/conf.d
+          readOnly: true
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"

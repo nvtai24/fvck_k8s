@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-pod
+  namespace: lab01
+  labels:
+    app: sidecar-demo
+spec:
+  volumes:
+    - name: shared-data
+      emptyDir: {}
+  containers:
+    - name: writer
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "<h1>Updated at: $(date)</h1>" > /shared/index.html
+            echo "Wrote index.html"
+            sleep 5
+          done
+      volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+    - name: reader
+      image: nginx:1.25
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: shared-data
+          mountPath: /usr/share/nginx/html
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"

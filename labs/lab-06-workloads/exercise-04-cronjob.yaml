@@ -1,0 +1,38 @@
+---
+# Exercise 4: CronJob — runs every minute
+# TODO: fill in all # TODO fields
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello-cron
+  namespace: lab06
+spec:
+  schedule: # TODO: "* * * * *"  (every minute)
+
+  concurrencyPolicy: # TODO: Forbid  (don't run new job if old is still running)
+
+  successfulJobsHistoryLimit: # TODO: 3
+  failedJobsHistoryLimit: # TODO: 1
+
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: # TODO: OnFailure
+          containers:
+            - name: hello
+              image: # TODO: busybox:1.36
+              command:
+                - sh
+                - -c
+                - # TODO: print current date and a hello message
+                  # Hint: "date && echo 'Hello from CronJob'"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "32Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "64Mi"

@@ -1,0 +1,53 @@
+---
+# Exercise 1: Resource QoS classes
+# Create 3 pods demonstrating Guaranteed, Burstable, BestEffort
+
+# Pod 1: GUARANTEED — requests == limits for both cpu and memory
+apiVersion: v1
+kind: Pod
+metadata:
+  name: guaranteed-pod
+  namespace: lab10
+spec:
+  containers:
+    - name: app
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: # TODO: "200m"
+          memory: # TODO: "128Mi"
+        limits:
+          cpu: # TODO: "200m"   ← must equal request for Guaranteed
+          memory: # TODO: "128Mi"  ← must equal request for Guaranteed
+
+---
+# Pod 2: BURSTABLE — has requests but limits > requests (or no limits)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: burstable-pod
+  namespace: lab10
+spec:
+  containers:
+    - name: app
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: # TODO: "100m"
+          memory: # TODO: "64Mi"
+        limits:
+          cpu: # TODO: "500m"   ← higher than request → Burstable
+          memory: # TODO: "256Mi"
+
+---
+# Pod 3: BESTEFFORT — no resources set at all
+apiVersion: v1
+kind: Pod
+metadata:
+  name: besteffort-pod
+  namespace: lab10
+spec:
+  containers:
+    - name: app
+      image: nginx:1.25
+      # TODO: intentionally no resources block here = BestEffort QoS

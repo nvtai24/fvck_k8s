@@ -1,0 +1,30 @@
+---
+# Exercise 3: ClusterRole + ClusterRoleBinding
+# TODO: fill in all # TODO fields
+
+# 1. ClusterRole — view nodes cluster-wide
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: # TODO: "node-viewer"
+rules:
+  - apiGroups: [""]
+    resources:
+      - # TODO: "nodes"
+    verbs:
+      - # TODO: get, list, watch
+
+---
+# 2. ClusterRoleBinding — grant to our ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: # TODO: "node-viewer-binding"
+subjects:
+  - kind: ServiceAccount
+    name: # TODO: "pod-reader-sa"
+    namespace: # TODO: lab07
+roleRef:
+  kind: # TODO: ClusterRole
+  name: # TODO: "node-viewer"
+  apiGroup: rbac.authorization.k8s.io

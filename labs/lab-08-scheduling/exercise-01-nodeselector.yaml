@@ -1,0 +1,23 @@
+---
+# Exercise 1: nodeSelector
+# TODO: fill in the nodeSelector to target nodes with disktype=ssd
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodeselector-pod
+  namespace: lab08
+spec:
+  nodeSelector:
+    disktype: # TODO: "ssd"
+
+  containers:
+    - name: nginx
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"

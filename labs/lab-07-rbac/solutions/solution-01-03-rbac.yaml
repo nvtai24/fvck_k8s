@@ -1,0 +1,59 @@
+---
+# SOLUTION 1: ServiceAccount + Role + RoleBinding
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-reader-sa
+  namespace: lab07
+automountServiceAccountToken: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader-role
+  namespace: lab07
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader-binding
+  namespace: lab07
+subjects:
+  - kind: ServiceAccount
+    name: pod-reader-sa
+    namespace: lab07
+roleRef:
+  kind: Role
+  name: pod-reader-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# SOLUTION 3: ClusterRole + ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-viewer
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-viewer-binding
+subjects:
+  - kind: ServiceAccount
+    name: pod-reader-sa
+    namespace: lab07
+roleRef:
+  kind: ClusterRole
+  name: node-viewer
+  apiGroup: rbac.authorization.k8s.io

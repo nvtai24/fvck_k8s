@@ -1,0 +1,42 @@
+---
+# Exercise 2: DaemonSet
+# TODO: fill in all # TODO fields
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-monitor
+  namespace: lab06
+  labels:
+    app: node-monitor
+spec:
+  selector:
+    matchLabels:
+      app: # TODO: "node-monitor"
+
+  updateStrategy:
+    type: # TODO: RollingUpdate
+
+  template:
+    metadata:
+      labels:
+        app: # TODO: "node-monitor"
+    spec:
+      tolerations:
+        # Allow scheduling on control-plane nodes too
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+
+      containers:
+        - name: monitor
+          image: # TODO: nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: # TODO: "50m"
+              memory: # TODO: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"

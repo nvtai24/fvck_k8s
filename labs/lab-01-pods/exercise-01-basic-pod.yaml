@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: basic-pod
+  namespace: lab01
+  labels:
+    app: basic-pod
+spec:
+  containers:
+    - name: nginx
+      image: # TODO: use nginx:1.25
+
+      ports:
+        - containerPort: # TODO: expose port 80
+
+      env:
+        - name: APP_ENV
+          value: # TODO: set value to "production"
+
+      resources:
+        requests:
+          cpu: # TODO: set to "100m"
+          memory: # TODO: set to "64Mi"
+        limits:
+          cpu: # TODO: set to "200m"
+          memory: # TODO: set to "128Mi"
+
+      livenessProbe:
+        httpGet:
+          path: # TODO: set path to /
+          port: # TODO: set port to 80
+        initialDelaySeconds: # TODO: 5 seconds
+        periodSeconds: # TODO: 10 seconds
+
+      readinessProbe:
+        httpGet:
+          path: # TODO: set path to /
+          port: # TODO: set port to 80
+        initialDelaySeconds: # TODO: 3 seconds
+        periodSeconds: # TODO: 5 seconds
+
+  restartPolicy: Always

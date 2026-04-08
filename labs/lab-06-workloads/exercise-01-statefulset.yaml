@@ -1,0 +1,63 @@
+---
+# Exercise 1: StatefulSet with headless service
+# TODO: fill in all # TODO fields
+
+# 1. Headless Service (required for StatefulSet)
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-headless
+  namespace: lab06
+spec:
+  clusterIP: # TODO: None  (this makes it headless)
+  selector:
+    app: # TODO: "web-sts"
+  ports:
+    - port: 80
+      name: http
+
+---
+# 2. StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web-sts
+  namespace: lab06
+spec:
+  serviceName: # TODO: "web-headless"
+  replicas: # TODO: 3
+  selector:
+    matchLabels:
+      app: # TODO: "web-sts"
+  template:
+    metadata:
+      labels:
+        app: # TODO: "web-sts"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: web-data
+              mountPath: # TODO: /usr/share/nginx/html
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+  # PVC template — creates 1 unique PVC per pod
+  volumeClaimTemplates:
+    - metadata:
+        name: # TODO: "web-data"
+      spec:
+        accessModes:
+          - # TODO: ReadWriteOnce
+        storageClassName: standard
+        resources:
+          requests:
+            storage: # TODO: "500Mi"

@@ -1,0 +1,24 @@
+---
+# Exercise 2: Pod using the ServiceAccount
+# (Apply exercise-01-rbac.yaml first)
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sa-demo-pod
+  namespace: lab07
+spec:
+  serviceAccountName: # TODO: "pod-reader-sa"
+  automountServiceAccountToken: true
+
+  containers:
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command: ["sleep", "3600"]
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "32Mi"
+        limits:
+          cpu: "100m"
+          memory: "64Mi"

@@ -1,0 +1,45 @@
+---
+# Exercise 3: Allow frontend → backend only
+# TODO: fill in the NetworkPolicy
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: lab09
+spec:
+  # This policy protects "backend" pods
+  podSelector:
+    matchLabels:
+      app: # TODO: "backend"
+
+  policyTypes:
+    - # TODO: Ingress
+
+  ingress:
+    - from:
+        # TODO: allow only from pods with label app=frontend
+        - podSelector:
+            matchLabels:
+              app: # TODO: "frontend"
+      ports:
+        - protocol: TCP
+          port: # TODO: 80
+
+---
+# Also allow DNS egress so frontend can resolve service names
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: lab09
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

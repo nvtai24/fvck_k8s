@@ -1,0 +1,62 @@
+---
+# SOLUTION 3: Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi-calculator
+  namespace: lab06
+spec:
+  completions: 1
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: pi
+          image: perl:5.34
+          command:
+            - "perl"
+            - "-Mbignum=bpi"
+            - "-wle"
+            - "print bpi(2000)"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+
+---
+# SOLUTION 4: CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello-cron
+  namespace: lab06
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: hello
+              image: busybox:1.36
+              command:
+                - sh
+                - -c
+                - "date && echo 'Hello from CronJob'"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "32Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "64Mi"

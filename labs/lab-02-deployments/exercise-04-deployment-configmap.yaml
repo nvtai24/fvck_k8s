@@ -1,0 +1,43 @@
+---
+# ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: lab02
+data:
+  APP_COLOR: # TODO: set to "blue"
+  APP_VERSION: # TODO: set to "1.0"
+
+---
+# Deployment that uses the ConfigMap
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-with-config
+  namespace: lab02
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-with-config
+  template:
+    metadata:
+      labels:
+        app: web-with-config
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+          # TODO: inject ALL keys from configmap "web-config" as env vars
+          # Hint: use envFrom with configMapRef
+          envFrom: []  # Replace [] with your envFrom definition
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

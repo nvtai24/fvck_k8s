@@ -1,0 +1,74 @@
+# Exercise 4: Volume Types Comparison
+# This file is pre-filled. Apply and observe the difference.
+# All 3 pods write something to their volume.
+# Delete and recreate them to see what survives.
+
+---
+# Pod 1: emptyDir — data lost when pod deleted
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vol-emptydir
+  namespace: lab05
+  labels:
+    vol-type: emptydir
+spec:
+  volumes:
+    - name: temp
+      emptyDir: {}
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "emptyDir data" > /data/file.txt
+          echo "Written to emptyDir. Will be LOST if pod is deleted."
+          sleep 3600
+      volumeMounts:
+        - name: temp
+          mountPath: /data
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "32Mi"
+        limits:
+          cpu: "100m"
+          memory: "64Mi"
+
+---
+# Pod 2: hostPath — survives pod deletion but tied to specific node
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vol-hostpath
+  namespace: lab05
+  labels:
+    vol-type: hostpath
+spec:
+  volumes:
+    - name: host-data
+      hostPath:
+        path: /tmp/lab05-hostpath
+        type: DirectoryOrCreate
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "hostPath data written at $(date)" > /data/file.txt
+          echo "Written to hostPath. Survives pod restart but tied to node."
+          sleep 3600
+      volumeMounts:
+        - name: host-data
+          mountPath: /data
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "32Mi"
+        limits:
+          cpu: "100m"
+          memory: "64Mi"
