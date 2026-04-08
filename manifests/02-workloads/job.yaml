@@ -1,0 +1,99 @@
+# ============================================================
+# Job
+# - Runs one or more pods to COMPLETION
+# - Unlike Deployments, pods are not restarted after success
+# - Use for: batch processing, database migrations, one-off tasks
+#
+# Key fields:
+#   completions:  Total number of successful completions needed
+#   parallelism:  Number of pods running simultaneously
+#   backoffLimit: Max retries before marking Job as failed
+# ============================================================
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration-job
+  namespace: default
+  labels:
+    app: db-migration
+spec:
+  # Total number of successful pod completions needed
+  completions: 1
+
+  # Number of pods to run in parallel
+  parallelism: 1
+
+  # Max attempts before failing the job (default: 6)
+  backoffLimit: 3
+
+  # Time limit for the entire job (seconds)
+  activeDeadlineSeconds: 300
+
+  # Keep completed jobs for 1 hour before auto-deletion
+  ttlSecondsAfterFinished: 3600
+
+  template:
+    metadata:
+      labels:
+        app: db-migration
+    spec:
+      # restartPolicy must be Never or OnFailure for Jobs
+      restartPolicy: Never   # 'OnFailure' restarts container in same pod
+
+      containers:
+        - name: migrator
+          image: myapp/migrator:v1.0
+          command: ["python", "manage.py", "migrate"]
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: url
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+---
+# ============================================================
+# Parallel Job Example (Work Queue Style)
+# - Run 5 workers in parallel to process a queue
+# ============================================================
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parallel-batch-job
+  namespace: default
+spec:
+  completions: 10       # Process 10 items total
+  parallelism: 3        # Run 3 workers at a time
+  backoffLimit: 5
+
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: worker
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Processing job item..."
+              sleep 10
+              echo "Done!"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"

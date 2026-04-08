@@ -1,0 +1,157 @@
+# ============================================================
+# StorageClass
+# - Defines how storage is dynamically provisioned
+# - When a PVC is created, K8s uses the StorageClass to
+#   automatically provision a matching PV
+# ============================================================
+
+---
+# Standard StorageClass (default on many clusters)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"   # Mark as default
+provisioner: docker.io/hostpath    # Local (Docker Desktop / minikube)
+reclaimPolicy: Delete              # Delete PV when PVC is deleted
+allowVolumeExpansion: true         # Allow resizing PVCs
+volumeBindingMode: Immediate       # Bind PVC to PV immediately
+
+---
+# AWS EBS StorageClass (example for cloud)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: aws-ebs-gp3
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  encrypted: "true"
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer   # Wait until pod is scheduled
+
+---
+# ============================================================
+# PersistentVolume (PV)
+# - Cluster-level resource (not namespace-scoped)
+# - Pre-provisioned storage (static provisioning)
+# - In production, usually created dynamically via StorageClass
+# ============================================================
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-pv
+  labels:
+    type: local
+spec:
+  # Total capacity
+  capacity:
+    storage: 5Gi
+
+  # Access modes
+  accessModes:
+    - ReadWriteOnce     # RWO: mounted rw by a single node
+  # Other modes:
+  #   - ReadOnlyMany    # ROX: mounted ro by many nodes
+  #   - ReadWriteMany   # RWX: mounted rw by many nodes
+
+  # What happens to PV when PVC is deleted
+  persistentVolumeReclaimPolicy: Retain
+  # Options: Retain (manual cleanup) | Delete (auto-delete) | Recycle (deprecated)
+
+  storageClassName: standard
+
+  # The actual storage backend
+  hostPath:
+    path: /data/my-pv    # On the node's filesystem (dev/testing only)
+    type: DirectoryOrCreate
+
+  # For NFS:
+  # nfs:
+  #   server: 192.168.1.100
+  #   path: /exported/path
+
+  # Selector to match specific PVs when binding (optional)
+  # nodeAffinity:
+  #   required:
+  #     nodeSelectorTerms:
+  #       - matchExpressions:
+  #           - key: kubernetes.io/hostname
+  #             operator: In
+  #             values: ["node1"]
+
+---
+# ============================================================
+# PersistentVolumeClaim (PVC)
+# - Namespace-scoped request for storage
+# - Binds to a matching PV (by size, access mode, storageClass)
+# ============================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc
+  namespace: default
+  labels:
+    app: myapp
+spec:
+  accessModes:
+    - ReadWriteOnce
+
+  storageClassName: standard   # Must match a StorageClass or existing PV
+
+  resources:
+    requests:
+      storage: 2Gi   # Request at least 2Gi; PV must have >= this
+
+  # Optionally select a specific PV by labels
+  # selector:
+  #   matchLabels:
+  #     type: local
+
+---
+# ============================================================
+# Pod using PVC
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-demo-pod
+  namespace: default
+spec:
+  volumes:
+    - name: data-storage
+      persistentVolumeClaim:
+        claimName: my-pvc    # Reference the PVC by name
+
+  containers:
+    - name: app
+      image: nginx:1.25
+      volumeMounts:
+        - name: data-storage
+          mountPath: /data    # The PVC is mounted here inside the container
+
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"
+
+# ============================================================
+# PVC States:
+#   Pending  — no matching PV found yet
+#   Bound    — successfully bound to a PV
+#   Lost     — the PV it was bound to is no longer available
+#
+# Check PVC status:
+#   kubectl get pvc
+#   kubectl describe pvc my-pvc
+# ============================================================

@@ -1,0 +1,122 @@
+# ============================================================
+# ResourceQuota
+# - Limits total resource consumption in a namespace
+# - Prevents one team/app from consuming all cluster resources
+# - Applied at namespace level
+# ============================================================
+
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: namespace-quota
+  namespace: default    # Apply quota to this namespace
+spec:
+  hard:
+    # --- Compute Resources ---
+    requests.cpu: "4"           # Total CPU requests across all pods
+    requests.memory: "8Gi"      # Total memory requests across all pods
+    limits.cpu: "8"             # Total CPU limits across all pods
+    limits.memory: "16Gi"       # Total memory limits across all pods
+
+    # --- Object Count Quotas ---
+    pods: "20"                  # Max number of pods
+    services: "10"              # Max number of services
+    secrets: "30"               # Max number of secrets
+    configmaps: "20"            # Max number of configmaps
+    persistentvolumeclaims: "10" # Max number of PVCs
+    services.loadbalancers: "2" # Max number of LoadBalancer services
+    services.nodeports: "5"     # Max number of NodePort services
+
+    # --- Storage Quotas ---
+    requests.storage: "50Gi"    # Total storage requested by all PVCs
+    standard.storageclass.storage.k8s.io/requests.storage: "30Gi"  # Per StorageClass
+
+---
+# ============================================================
+# LimitRange
+# - Sets default requests/limits for containers
+# - Enforces min/max bounds per container, pod, or PVC
+# - Applied at namespace level
+# ============================================================
+
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: default
+spec:
+  limits:
+    # --- Container limits ---
+    - type: Container
+      default:               # Default LIMIT if not specified
+        cpu: "500m"
+        memory: "256Mi"
+      defaultRequest:        # Default REQUEST if not specified
+        cpu: "100m"
+        memory: "128Mi"
+      max:                   # Maximum allowed values
+        cpu: "2"
+        memory: "1Gi"
+      min:                   # Minimum allowed values
+        cpu: "50m"
+        memory: "32Mi"
+      maxLimitRequestRatio:  # Limit cannot exceed request by more than this
+        cpu: "4"             # limit.cpu / request.cpu <= 4
+        memory: "2"
+
+    # --- Pod limits ---
+    - type: Pod
+      max:                   # Total max for all containers in a pod
+        cpu: "4"
+        memory: "2Gi"
+      min:
+        cpu: "100m"
+        memory: "64Mi"
+
+    # --- PVC limits ---
+    - type: PersistentVolumeClaim
+      max:
+        storage: "10Gi"
+      min:
+        storage: "100Mi"
+
+---
+# ============================================================
+# PodDisruptionBudget (PDB)
+# - Ensures minimum availability during voluntary disruptions:
+#   - Node drain (kubectl drain)
+#   - Cluster upgrades
+#   - Rolling deployments
+# - Does NOT apply to involuntary disruptions (node failure, OOM)
+# ============================================================
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nginx-pdb
+  namespace: default
+spec:
+  # Use EITHER minAvailable OR maxUnavailable, not both
+
+  # Option A: Minimum number of pods that must be available
+  minAvailable: 2
+  # Can also use percentage:
+  # minAvailable: "50%"
+
+  # Option B: Maximum pods that can be unavailable at one time
+  # maxUnavailable: 1
+  # maxUnavailable: "25%"
+
+  selector:
+    matchLabels:
+      app: nginx    # Applies to pods matching this selector
+
+# ============================================================
+# Example scenario:
+# - Deployment has 3 replicas with "app: nginx" label
+# - PDB has minAvailable: 2
+# - When you run "kubectl drain <node>", K8s will ensure
+#   at least 2 nginx pods remain running during the drain
+# - If only 2 pods, the drain waits until a pod is rescheduled
+#   before evicting the next one
+# ============================================================

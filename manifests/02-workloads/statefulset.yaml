@@ -1,0 +1,118 @@
+# ============================================================
+# StatefulSet
+# - For stateful applications (databases, message queues, etc.)
+# - Provides stable network identity: pod-0, pod-1, pod-2
+# - Provides stable persistent storage per pod via volumeClaimTemplates
+# - Ordered deployment and scaling (pod-0 first, then pod-1, etc.)
+# - Ordered rolling updates (reverse order: pod-2 → pod-1 → pod-0)
+# ============================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: default
+  labels:
+    app: mysql
+spec:
+  # Number of replicas
+  replicas: 3
+
+  # Service name — MUST be a Headless Service (clusterIP: None)
+  # Pods get DNS: <pod-name>.<serviceName>.<namespace>.svc.cluster.local
+  # e.g., mysql-0.mysql-headless.default.svc.cluster.local
+  serviceName: "mysql-headless"
+
+  # Label selector
+  selector:
+    matchLabels:
+      app: mysql
+
+  # Update strategy
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0    # Only update pods with ordinal >= partition (for canary rollouts)
+
+  # Pod Management Policy
+  # OrderedReady (default): one at a time, must be ready before next
+  # Parallel: start/stop all pods simultaneously (faster, less safe)
+  podManagementPolicy: OrderedReady
+
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+              name: mysql
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            - name: MYSQL_DATABASE
+              value: "mydb"
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+
+          volumeMounts:
+            # Mount the PVC created per-pod by volumeClaimTemplates
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+
+          readinessProbe:
+            exec:
+              command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+  # PVC template — creates a unique PVC for EACH pod
+  # PVC names: mysql-data-mysql-0, mysql-data-mysql-1, mysql-data-mysql-2
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 10Gi
+
+---
+# Headless Service for StatefulSet
+# clusterIP: None means no virtual IP — DNS resolves to individual pod IPs
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-headless
+  namespace: default
+  labels:
+    app: mysql
+spec:
+  clusterIP: None     # This makes it a headless service
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      name: mysql

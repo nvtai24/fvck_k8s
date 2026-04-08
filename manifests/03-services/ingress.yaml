@@ -1,0 +1,132 @@
+# ============================================================
+# Ingress
+# - HTTP/HTTPS routing from outside the cluster to internal Services
+# - Requires an Ingress Controller (nginx, traefik, HAProxy, etc.)
+#
+# Install nginx ingress controller (example):
+# kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+# ============================================================
+
+---
+# ============================================================
+# 1. Basic Ingress — Single service
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: basic-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  # Ingress class to use (which controller handles this ingress)
+  ingressClassName: nginx
+
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx-clusterip
+                port:
+                  number: 80
+
+---
+# ============================================================
+# 2. Advanced Ingress
+# - Host-based routing (multiple domains)
+# - Path-based routing (/api, /web, /admin)
+# - TLS termination
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: advanced-ingress
+  namespace: default
+  annotations:
+    # nginx ingress annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://myfrontend.example.com"
+
+spec:
+  ingressClassName: nginx
+
+  # TLS configuration
+  tls:
+    - hosts:
+        - api.example.com
+        - web.example.com
+      secretName: example-tls-secret    # TLS secret with cert + key
+
+  rules:
+    # --- api.example.com ---
+    - host: api.example.com
+      http:
+        paths:
+          - path: /v1(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-service-v1
+                port:
+                  number: 8080
+          - path: /v2(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-service-v2
+                port:
+                  number: 8080
+
+    # --- web.example.com ---
+    - host: web.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 3000
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-service
+                port:
+                  number: 3001
+
+---
+# ============================================================
+# TLS Secret for Ingress
+# cert and key are base64 encoded
+# Generate with: openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#   -keyout tls.key -out tls.crt -subj "/CN=example.com"
+# kubectl create secret tls example-tls-secret --cert=tls.crt --key=tls.key
+# ============================================================
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-tls-secret
+  namespace: default
+type: kubernetes.io/tls
+data:
+  tls.crt: <base64-encoded-certificate>
+  tls.key: <base64-encoded-private-key>

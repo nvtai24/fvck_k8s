@@ -1,0 +1,64 @@
+# ============================================================
+# Basic Pod
+# - Single container running nginx
+# - Resource requests & limits
+# - Environment variables
+# - Liveness & Readiness probes
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: basic-nginx
+  namespace: default
+  labels:
+    app: nginx
+    env: demo
+  annotations:
+    description: "A basic nginx pod for demo purposes"
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.25
+      ports:
+        - containerPort: 80
+          name: http
+
+      # Environment variables (static)
+      env:
+        - name: APP_ENV
+          value: "production"
+        - name: APP_PORT
+          value: "80"
+
+      # Resource requests and limits
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"
+
+      # Liveness probe — restart container if it fails
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        failureThreshold: 3
+
+      # Readiness probe — remove from Service endpoints if not ready
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 3
+        periodSeconds: 5
+
+  # Restart policy: Always (default), OnFailure, Never
+  restartPolicy: Always
+
+  # Graceful termination period (seconds)
+  terminationGracePeriodSeconds: 30

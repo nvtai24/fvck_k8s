@@ -1,0 +1,110 @@
+# ============================================================
+# CronJob
+# - Runs Jobs on a time-based schedule (standard cron syntax)
+# - Creates a new Job object for each scheduled run
+#
+# Cron syntax: minute hour day-of-month month day-of-week
+#   *  = any value
+#   ,  = value list separator
+#   -  = range of values
+#   /  = step values
+#
+# Examples:
+#   "0 * * * *"    = Every hour at minute 0
+#   "*/15 * * * *" = Every 15 minutes
+#   "0 2 * * *"    = Every day at 2:00 AM
+#   "0 2 * * 0"    = Every Sunday at 2:00 AM
+#   "0 9 1 * *"    = First day of every month at 9:00 AM
+# ============================================================
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-backup
+  namespace: default
+  labels:
+    app: backup
+spec:
+  # Cron schedule (UTC by default)
+  schedule: "0 2 * * *"    # Run every day at 2:00 AM UTC
+
+  # Timezone support (K8s >= 1.27)
+  timeZone: "Asia/Ho_Chi_Minh"
+
+  # Policy when a scheduled run is missed:
+  # Allow (default), Forbid, Replace
+  concurrencyPolicy: Forbid   # Don't run a new job if previous is still running
+
+  # How many successful/failed job histories to retain
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+  # How many seconds past schedule time to still start the job (0 = skip if late)
+  startingDeadlineSeconds: 200
+
+  # Suspend the schedule without deleting the CronJob
+  suspend: false
+
+  # Job template (same as a regular Job spec)
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600   # Job must complete within 10 minutes
+      ttlSecondsAfterFinished: 86400   # Clean up after 24 hours
+
+      template:
+        metadata:
+          labels:
+            app: backup
+        spec:
+          restartPolicy: OnFailure
+
+          containers:
+            - name: backup
+              image: myapp/backup-tool:v1.0
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  echo "Starting backup at $(date)"
+                  # Perform backup logic here
+                  pg_dump -h $DB_HOST -U $DB_USER $DB_NAME > /tmp/backup.sql
+                  aws s3 cp /tmp/backup.sql s3://my-backups/$(date +%Y%m%d)/backup.sql
+                  echo "Backup completed at $(date)"
+
+              env:
+                - name: DB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: db-config
+                      key: host
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-secret
+                      key: username
+                - name: DB_NAME
+                  value: "mydb"
+
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+
+# ============================================================
+# Useful CronJob Commands:
+#
+# kubectl get cronjobs
+# kubectl describe cronjob daily-backup
+# kubectl get jobs --watch                   # Watch jobs created by CronJob
+#
+# Manually trigger a CronJob immediately:
+# kubectl create job --from=cronjob/daily-backup manual-backup-$(date +%s)
+#
+# Suspend a CronJob:
+# kubectl patch cronjob daily-backup -p '{"spec":{"suspend":true}}'
+# ============================================================

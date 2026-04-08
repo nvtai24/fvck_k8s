@@ -1,0 +1,126 @@
+# ============================================================
+# Deployment
+# - Manages ReplicaSets with rolling update & rollback support
+# - Most commonly used workload controller
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: default
+  labels:
+    app: nginx
+  annotations:
+    description: "Demo nginx deployment with rolling update strategy"
+spec:
+  # Desired number of pod replicas
+  replicas: 3
+
+  # Label selector — must match pod template labels
+  selector:
+    matchLabels:
+      app: nginx
+
+  # Update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1         # Max extra pods during rollout (can be number or %)
+      maxUnavailable: 0   # Max pods unavailable during rollout (0 = always at full capacity)
+  # Alternatively use Recreate strategy:
+  # strategy:
+  #   type: Recreate      # Kill all old pods then create new ones
+
+  # How many old ReplicaSets to keep for rollback
+  revisionHistoryLimit: 5
+
+  # Minimum seconds a pod is ready before considered "available"
+  minReadySeconds: 5
+
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: nginx
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25
+
+          ports:
+            - containerPort: 80
+              name: http
+
+          # Environment variables from ConfigMap and Secret
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config     # ConfigMap name
+                  key: db_host
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret     # Secret name
+                  key: db_password
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          # Liveness probe — restart if fails
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+
+          # Readiness probe — remove from Service if not ready
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+
+          # Startup probe — give slow containers time to start
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            failureThreshold: 30    # 30 x periodSeconds (10s) = 5 min to start
+            periodSeconds: 10
+
+          # Lifecycle hooks
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]   # Drain connections before SIGTERM
+
+      # Graceful termination period
+      terminationGracePeriodSeconds: 30
+
+# ============================================================
+# Useful Commands for this Deployment:
+#
+# kubectl apply -f deployment.yaml
+# kubectl rollout status deployment/nginx-deployment
+# kubectl rollout history deployment/nginx-deployment
+# kubectl rollout undo deployment/nginx-deployment
+# kubectl rollout undo deployment/nginx-deployment --to-revision=2
+# kubectl scale deployment nginx-deployment --replicas=5
+# kubectl set image deployment/nginx-deployment nginx=nginx:1.26
+# ============================================================

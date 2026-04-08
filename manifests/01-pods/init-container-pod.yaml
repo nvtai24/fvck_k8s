@@ -1,0 +1,67 @@
+# ============================================================
+# Init Container Pod
+# - Init container runs BEFORE main container starts
+# - Use case: wait for a dependency (e.g., database) to be ready
+#             or pre-populate a shared volume
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-container-pod
+  namespace: default
+  labels:
+    app: init-demo
+spec:
+  volumes:
+    - name: workdir
+      emptyDir: {}
+
+  # Init containers run to completion in ORDER before main containers start
+  initContainers:
+    # --- Init Container 1: check if a service is reachable ---
+    - name: wait-for-service
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for myservice to be ready..."
+          until nslookup myservice.default.svc.cluster.local; do
+            echo "Service not ready yet. Retrying in 2s..."
+            sleep 2
+          done
+          echo "Service is ready!"
+
+    # --- Init Container 2: seed data into shared volume ---
+    - name: seed-data
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "Seeding initial data..."
+          echo "<h1>Hello from Init Container!</h1>" > /work-dir/index.html
+          echo "Done seeding data."
+      volumeMounts:
+        - name: workdir
+          mountPath: /work-dir
+
+  # Main container starts only after ALL init containers complete
+  containers:
+    - name: nginx
+      image: nginx:1.25
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: workdir
+          mountPath: /usr/share/nginx/html
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"
+
+  restartPolicy: Always

@@ -1,0 +1,252 @@
+# ============================================================
+# Scheduling & Placement
+# - nodeSelector
+# - Node Affinity (required and preferred)
+# - Pod Affinity & Anti-Affinity
+# - Taints & Tolerations
+# - All concepts in one file with examples
+# ============================================================
+
+---
+# ============================================================
+# 1. nodeSelector (simplest form)
+# - Schedule pod ONLY on nodes with matching labels
+# - Hard requirement — no matching node = pod stays Pending
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodeselector-demo
+  namespace: default
+spec:
+  nodeSelector:
+    disktype: ssd              # Node must have this label
+    kubernetes.io/os: linux    # Built-in node label
+
+  containers:
+    - name: nginx
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"
+
+---
+# ============================================================
+# 2. Node Affinity
+# - More expressive than nodeSelector
+# - Supports "required" (hard) and "preferred" (soft) rules
+# - Supports: In, NotIn, Exists, DoesNotExist, Gt, Lt operators
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-affinity-demo
+  namespace: default
+spec:
+  affinity:
+    nodeAffinity:
+
+      # HARD rule — must match, or pod won't schedule
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values: ["linux"]
+              - key: disktype
+                operator: In
+                values: ["ssd", "nvme"]
+
+      # SOFT rule — prefer, but not required
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 80                 # Higher weight = stronger preference (1-100)
+          preference:
+            matchExpressions:
+              - key: zone
+                operator: In
+                values: ["us-east-1a"]
+        - weight: 20
+          preference:
+            matchExpressions:
+              - key: instance-type
+                operator: In
+                values: ["m5.large", "m5.xlarge"]
+
+  containers:
+    - name: app
+      image: nginx:1.25
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"
+
+---
+# ============================================================
+# 3. Pod Affinity & Anti-Affinity
+# - Co-locate or spread pods relative to OTHER pods
+# - Topology key determines the "zone" of co-location
+#   Common topology keys:
+#     kubernetes.io/hostname  (per node)
+#     topology.kubernetes.io/zone (per availability zone)
+#     topology.kubernetes.io/region (per region)
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-affinity-demo
+  namespace: default
+  labels:
+    app: backend
+spec:
+  affinity:
+
+    # Pod Affinity — schedule near pods with matching labels
+    podAffinity:
+      # HARD: must be on same node as a "cache" pod
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: redis-cache
+          topologyKey: kubernetes.io/hostname    # Same node
+
+    # Pod Anti-Affinity — spread away from pods with matching labels
+    podAntiAffinity:
+      # SOFT: try not to place on same zone as another "backend" pod
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app: backend
+            topologyKey: topology.kubernetes.io/zone   # Different zone
+
+  containers:
+    - name: backend
+      image: myapp/backend:v1.0
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "256Mi"
+
+---
+# ============================================================
+# 4. Taints & Tolerations
+#
+# Taint a node:
+# kubectl taint nodes node1 gpu=true:NoSchedule
+# kubectl taint nodes node1 maintenance=true:NoExecute
+#
+# Remove a taint:
+# kubectl taint nodes node1 gpu=true:NoSchedule-
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: toleration-demo
+  namespace: default
+spec:
+  tolerations:
+    # Tolerate the "gpu=true:NoSchedule" taint
+    - key: "gpu"
+      operator: "Equal"    # Exact match
+      value: "true"
+      effect: "NoSchedule"
+
+    # Tolerate ANY taint with key "dedicated" (regardless of value)
+    - key: "dedicated"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+    # Tolerate maintenance taint — pod won't be evicted for 1 hour
+    - key: "maintenance"
+      operator: "Equal"
+      value: "true"
+      effect: "NoExecute"
+      tolerationSeconds: 3600    # Stay for 1 hour, then evicted
+
+    # Tolerate ALL taints (use with caution — allows scheduling on any node)
+    # - operator: "Exists"
+
+  containers:
+    - name: gpu-app
+      image: nvidia/cuda:12.0-base
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+          nvidia.com/gpu: "1"    # Request 1 GPU (requires device plugin)
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+          nvidia.com/gpu: "1"
+
+---
+# ============================================================
+# 5. Complete Deployment with all placement controls
+# ============================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deployment-placement
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      # Spread across availability zones (anti-affinity)
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: web
+              topologyKey: topology.kubernetes.io/zone
+
+        # Prefer nodes with SSD
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: disktype
+                    operator: In
+                    values: ["ssd"]
+
+      # Tolerate spot/preemptible node taint
+      tolerations:
+        - key: "cloud.google.com/gke-spot"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+
+      containers:
+        - name: web
+          image: nginx:1.25
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

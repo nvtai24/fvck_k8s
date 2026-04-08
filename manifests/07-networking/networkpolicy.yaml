@@ -1,0 +1,186 @@
+# ============================================================
+# NetworkPolicy
+# - Controls pod-to-pod and external traffic (like a firewall)
+# - By default, ALL pods can communicate with ALL pods
+# - Once a NetworkPolicy selects a pod, ONLY explicitly allowed
+#   traffic is permitted (default deny for selected direction)
+# - Requires CNI plugin with NetworkPolicy support:
+#   Calico, Cilium, Weave Net, Antrea
+# ============================================================
+
+---
+# ============================================================
+# 1. Default Deny All (both Ingress and Egress)
+# - Applies to all pods in the namespace
+# - Use as a baseline then explicitly allow needed traffic
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  podSelector: {}     # {} = select ALL pods in namespace
+  policyTypes:
+    - Ingress
+    - Egress
+  # No rules = deny all matched traffic
+
+---
+# ============================================================
+# 2. Allow specific ingress to backend pods from frontend pods
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend      # This policy applies to backend pods
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow traffic FROM frontend pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# ============================================================
+# 3. Allow traffic from specific namespace
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-monitoring-namespace
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: myapp
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow from any pod in the "monitoring" namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+
+---
+# ============================================================
+# 4. Combined namespace + pod selector (AND logic)
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-specific-pods-from-namespace
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: myapp
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        # Both conditions must be true (AND):
+        - namespaceSelector:
+            matchLabels:
+              environment: production
+          podSelector:           # <-- Same list item = AND
+            matchLabels:
+              role: prometheus
+
+---
+# ============================================================
+# 5. Allow egress to specific IP ranges (external API)
+# ============================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-external-api
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: myapp
+
+  policyTypes:
+    - Egress
+
+  egress:
+    # Allow to specific external IPs
+    - to:
+        - ipBlock:
+            cidr: 203.0.113.0/24    # External API server IP range
+            except:
+              - 203.0.113.5/32      # Exclude specific IP
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Always allow DNS resolution (port 53)
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# ============================================================
+# 6. Full isolation with selective allow
+# - Deny all by default, then allow frontend → backend → database
+# ============================================================
+
+# Allow backend to reach database
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-db
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: database
+
+  policyTypes:
+    - Ingress
+
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - protocol: TCP
+          port: 5432    # PostgreSQL
+
+# ============================================================
+# Tips:
+# - Use "kubectl describe netpol <name>" to inspect policies
+# - Test connectivity: kubectl exec -it <pod> -- curl <other-pod-ip>
+# - Multiple "from" items in same rule = OR logic
+# - namespaceSelector + podSelector in same item = AND logic
+# ============================================================

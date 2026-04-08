@@ -1,0 +1,113 @@
+# ============================================================
+# ConfigMap
+# - Stores non-sensitive key-value configuration
+# - Can be consumed as: env vars, command args, or mounted files
+# ============================================================
+
+---
+# ============================================================
+# 1. ConfigMap from literal values
+# ============================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+  labels:
+    app: myapp
+data:
+  # Simple key-value pairs
+  db_host: "mysql.default.svc.cluster.local"
+  db_port: "3306"
+  db_name: "myapp_db"
+  app_env: "production"
+  log_level: "info"
+  max_connections: "100"
+
+  # Multi-line value (file content)
+  app.properties: |
+    server.port=8080
+    server.host=0.0.0.0
+    database.pool.size=10
+    cache.ttl=300
+
+  # nginx.conf as a config file
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name _;
+        location / {
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+        }
+        location /health {
+            return 200 "OK";
+        }
+    }
+
+---
+# ============================================================
+# 2. Using ConfigMap in a Pod
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-demo-pod
+  namespace: default
+spec:
+  volumes:
+    # Mount entire ConfigMap as a directory of files
+    - name: config-volume
+      configMap:
+        name: app-config
+        # Optionally select specific keys
+        items:
+          - key: nginx.conf
+            path: nginx.conf       # File name in the mounted directory
+          - key: app.properties
+            path: app.properties
+
+  containers:
+    - name: app
+      image: nginx:1.25
+
+      # Option 1: Inject specific keys as env vars
+      env:
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: db_host
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: log_level
+
+      # Option 2: Inject ALL keys as env vars at once
+      envFrom:
+        - configMapRef:
+            name: app-config
+
+      # Option 3: Mount as volume (files)
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/myapp/config   # Files appear here
+          readOnly: true
+
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"
+
+# ============================================================
+# Notes:
+# - ConfigMap updates via volume: files update automatically (within ~1 min)
+# - ConfigMap updates via env vars: pod must be restarted to pick up changes
+# - Max size: 1MB per ConfigMap
+# ============================================================

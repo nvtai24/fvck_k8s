@@ -1,0 +1,185 @@
+# ============================================================
+# RBAC — Role-Based Access Control
+#
+# Objects:
+#   ServiceAccount  — identity for pods
+#   Role            — permissions in a namespace
+#   ClusterRole     — permissions across the cluster
+#   RoleBinding     — bind Role/ClusterRole to subject in a namespace
+#   ClusterRoleBinding — bind ClusterRole to subject globally
+#
+# Subjects (who gets permissions):
+#   - User
+#   - Group
+#   - ServiceAccount
+# ============================================================
+
+---
+# ============================================================
+# 1. ServiceAccount
+# - Identity for pods to authenticate to the Kubernetes API
+# - Default SA is created automatically per namespace
+# ============================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myapp-sa
+  namespace: default
+  labels:
+    app: myapp
+automountServiceAccountToken: false   # Disable auto-mount for security
+                                      # Mount manually when needed
+
+---
+# ============================================================
+# 2. Role (namespace-scoped)
+# - Grants permissions within a specific namespace only
+# ============================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: default
+rules:
+  # Rule 1: Read pods in this namespace
+  - apiGroups: [""]             # "" = core API group (pods, services, etc.)
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Rule 2: Read pod logs
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+
+  # Rule 3: Read and create ConfigMaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "update", "patch"]
+
+---
+# ============================================================
+# 3. ClusterRole
+# - Grants permissions across ALL namespaces (or for cluster-level resources)
+# - Can also be bound to a specific namespace via RoleBinding
+# ============================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-reader
+rules:
+  # Access cluster-level resources (no namespace)
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Access persistent volumes (cluster-scoped)
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+
+  # Access deployments across all namespaces
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow all verbs on secrets (admin-level example)
+  # - apiGroups: [""]
+  #   resources: ["secrets"]
+  #   verbs: ["*"]             # "*" = all verbs
+
+---
+# ============================================================
+# 4. RoleBinding (namespace-scoped)
+# - Binds a Role OR ClusterRole to subjects within a namespace
+# ============================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: myapp-pod-reader-binding
+  namespace: default
+subjects:
+  # Bind to a ServiceAccount in the same namespace
+  - kind: ServiceAccount
+    name: myapp-sa
+    namespace: default
+
+  # Bind to a specific user
+  # - kind: User
+  #   name: jane@example.com
+  #   apiGroup: rbac.authorization.k8s.io
+
+  # Bind to a group
+  # - kind: Group
+  #   name: developers
+  #   apiGroup: rbac.authorization.k8s.io
+
+roleRef:
+  kind: Role          # Can also be ClusterRole
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ============================================================
+# 5. ClusterRoleBinding
+# - Binds a ClusterRole to subjects across the ENTIRE cluster
+# ============================================================
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-reader-binding
+subjects:
+  - kind: ServiceAccount
+    name: myapp-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: node-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ============================================================
+# 6. Pod using a ServiceAccount
+# ============================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rbac-demo-pod
+  namespace: default
+spec:
+  serviceAccountName: myapp-sa    # Use the SA we created
+
+  automountServiceAccountToken: true  # Override SA default to mount token
+
+  containers:
+    - name: app
+      image: bitnami/kubectl:latest
+      command: ["sleep", "infinity"]
+      # This pod can now call kube-apiserver with the permissions
+      # granted via Role/RoleBinding above
+      resources:
+        requests:
+          cpu: "50m"
+          memory: "32Mi"
+        limits:
+          cpu: "100m"
+          memory: "64Mi"
+
+# ============================================================
+# Useful RBAC Commands:
+#
+# Check if a ServiceAccount can do something:
+# kubectl auth can-i list pods --as=system:serviceaccount:default:myapp-sa
+#
+# Check your own permissions:
+# kubectl auth can-i create deployments
+#
+# List all roles in namespace:
+# kubectl get roles,rolebindings -n default
+# kubectl get clusterroles,clusterrolebindings
+# ============================================================
